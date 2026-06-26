@@ -52,7 +52,6 @@ signals:
     void modeChanged();
     void gpusChanged();
     void configChanged();
-    void setModeFinished();
 
 private:
     DaemonController();

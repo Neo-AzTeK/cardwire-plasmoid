@@ -56,7 +56,7 @@ This will automatically:
 
 To uninstall the package at any time:
 ```bash
-sudo pacman -R cardwire-plasmoid-git
+sudo pacman -R cardwire-plasmoid
 ```
 
 ---

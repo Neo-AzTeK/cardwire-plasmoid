@@ -8,7 +8,6 @@ This widget provides seamless control over hybrid and multi-GPU setups on Linux,
 
 - **GPU Mode Switcher:** Switch on-the-fly between **Integrated**, **Hybrid**, **Smart**, and **Manual** rendering modes directly from a clean tray popup.
 - **Dynamic Tray Icon:** Instantly reflects your current active GPU mode and discrete GPU power state (Active vs. Suspended).
-- **System Tray Visibility Configuration:** Configure the widget icon to automatically show or hide in the system tray based on AC power status and GPU activity, matching `supergfxctl-plasmoid` visibility options.
 - **Daemon Configuration:** Configure options like `auto_apply_gpu_state`, `experimental_nvidia_block`, and `battery_auto_switch` from the standard KDE Plasma widget settings panel.
 
 ---

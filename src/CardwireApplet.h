@@ -2,7 +2,6 @@
 #define CARDWIREAPPLET_H
 
 #include <Plasma/Applet>
-#include <Solid/Battery>
 #include <QVariantList>
 #include "DaemonController.h"
 
@@ -12,7 +11,6 @@ class CardwireApplet : public Plasma::Applet {
     Q_PROPERTY(quint32 mode READ mode NOTIFY modeChanged)
     Q_PROPERTY(QVariantList gpus READ gpus NOTIFY gpusChanged)
     Q_PROPERTY(QString iconName READ iconName NOTIFY iconNameChanged)
-    Q_PROPERTY(bool isCharging READ isCharging NOTIFY chargingChanged)
 
     // Config properties
     Q_PROPERTY(bool autoApplyGpuState READ autoApplyGpuState WRITE setAutoApplyGpuState NOTIFY configChanged)
@@ -28,7 +26,6 @@ public:
     quint32 mode() const;
     QVariantList gpus() const;
     QString iconName() const;
-    bool isCharging() const;
 
     bool autoApplyGpuState() const;
     Q_INVOKABLE void setAutoApplyGpuState(bool state);
@@ -43,18 +40,15 @@ public:
     Q_INVOKABLE void setBatteryAutoSwitchMode(quint32 mode);
 
     Q_INVOKABLE void setMode(quint32 mode);
-    Q_INVOKABLE void refreshDevices();
 
 signals:
     void daemonFailingChanged();
     void modeChanged();
     void gpusChanged();
     void iconNameChanged();
-    void chargingChanged();
     void configChanged() override;
 
 private:
-    const Solid::Battery *battery = nullptr;
 };
 
 #endif // CARDWIREAPPLET_H

@@ -201,7 +201,6 @@ void DaemonController::setMode(quint32 mode) {
 
     runCommand({"set", modeStr}, [this](const QString & /*output*/, int /*exitCode*/) {
         fetchMode();
-        emit setModeFinished();
     });
 }
 

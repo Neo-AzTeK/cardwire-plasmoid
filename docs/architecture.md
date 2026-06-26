@@ -26,7 +26,7 @@ graph TD
 ### Key Elements:
 * **Sequential Queue:** Commands are enqueued in `m_commandQueue` as `CommandRequest` structs containing arguments and callback handlers. This guarantees that only one `QProcess` is active at any time, preventing resource exhaustion and race conditions.
 * **Reentrancy Protection:** The coordinator captures the active process pointer inside the finish callback lambda and updates the queue status safely. If a callback triggers a nested `runCommand` (for example, fetching status right after setting a configuration), it enqueues correctly without overwriting active process state or causing segmentation faults.
-* **Low-Overhead Polling:** The 5-second periodic timer in `pollDaemon()` only queries status and active mode. Individual configuration values and the full GPU list are queried only once during startup or manually when requested via the refresh button.
+* **Low-Overhead Polling:** The 2-second periodic timer in `pollDaemon()` only queries status and active mode. Individual configuration values and the full GPU list are queried only once during startup or when the daemon reconnects.
 
 ---
 
