@@ -1,69 +1,59 @@
-# Cardwire KDE Plasma Widget
+# cardwire-plasmoid
 
-A modern, high-performance KDE Plasma 6 widget for monitoring and switching GPU modes via `cardwired`.
+A KDE Plasma 6 system tray widget to monitor and switch GPU modes using `cardwire`.
 
-This widget provides seamless control over hybrid and multi-GPU setups on Linux, communicating asynchronously with the system daemon to ensure a zero-lag desktop experience.
+## Disclaimer
 
----
+> This project has been vibe-coded but I've taken great care to ensure that everything makes sense. I'm not well versed in kde widget development and cpp programming. I'm open to criticism and suggestions. Feel free to open an issue or submit a pr.
 
-- **GPU Mode Switcher:** Switch on-the-fly between **Integrated**, **Hybrid**, **Smart**, and **Manual** rendering modes directly from a clean tray popup.
-- **Dynamic Tray Icon:** Instantly reflects your current active GPU mode and discrete GPU power state (Active vs. Suspended).
-- **Daemon Configuration:** Configure options like `auto_apply_gpu_state`, `experimental_nvidia_block`, and `battery_auto_switch` from the standard KDE Plasma widget settings panel.
+## Features
 
----
+- **Toggle Modes:** Switch between **Integrated**, **Hybrid**, **Smart**, and **Manual** modes right from your system tray.
+- **Dynamic Icons:** The tray icon changes color/variant depending on which mode is active and whether your dedicated GPU is awake (`D0`) or suspended (`D3cold`).
+- **Native Settings:** Access configuration options like `auto_apply_gpu_state` and `battery_auto_switch` from the standard Plasma widget settings.
+- **Lightweight:** Spawns asynchronous queries with a 2-second interval, and reads power states directly from sysfs to avoid lag or waking up your GPU.
 
-## Documentation
+<p align="center">
+  <img src="docs/system_tray.png" width="48%" alt="System Tray Popup" />
+  <img src="docs/settings.png" width="48%" alt="Settings Panel" />
+</p>
 
-For deep technical details and advanced deployment guides, refer to:
-- **[Architecture & Design](file:///home/mixcraftio/Code/Repos/GPU/cardwire-plasmoid/docs/architecture.md):** Deep-dive into the reentrant `QProcess` queue, sysfs monitoring, and QML layout architecture.
-- **[Detailed Installation & Deployment](file:///home/mixcraftio/Code/Repos/GPU/cardwire-plasmoid/docs/installation_and_deployment.md):** Build options, testing, manual instructions, and troubleshooting.
+## Installation
 
----
+### Arch Linux
 
-## Installation (Arch Linux)
+Use the provided `PKGBUILD` to build and install the widget:
 
-On Arch Linux, the recommended way to install and manage the widget is using the provided [PKGBUILD](file:///home/mixcraftio/Code/Repos/GPU/cardwire-plasmoid/PKGBUILD). This builds the package from source and registers it with `pacman` for clean updates and uninstallation.
-
-### 1. Install Build Dependencies
-```bash
-sudo pacman -S cmake extra-cmake-modules libplasma qt6-base qt6-declarative kconfig ki18n solid cardwire
-```
-
-### 2. Build and Install via PKGBUILD
-In the root directory of the repository, run:
 ```bash
 makepkg -si
 ```
 
-### 3. Uninstalling
-To cleanly uninstall the widget and remove all files, run:
+### Other Distributions (CMake)
+
+For other distributions running KDE Plasma 6 (like Fedora, openSUSE, or Kubuntu/KDE Neon), you can build and install manually using CMake.
+
+#### 1. Install Build Dependencies
+Ensure you have `cmake`, `extra-cmake-modules` (ECM), and development headers for `Qt6` (Qml, Gui, Core, DBus), `KF6` (Config, I18n, Solid), and `libplasma` installed:
+
+* **Fedora:**
+  ```bash
+  sudo dnf install cmake extra-cmake-modules kf6-kconfig-devel kf6-ki18n-devel kf6-solid-devel libplasma-devel qt6-qtbase-devel qt6-qtdeclarative-devel gcc-c++ gettext
+  ```
+* **Ubuntu / Debian / KDE Neon:**
+  ```bash
+  sudo apt install cmake extra-cmake-modules libkf6config-dev libkf6i18n-dev libkf6solid-dev libplasma-dev qt6-base-dev qt6-declarative-dev g++ gettext
+  ```
+
+#### 2. Build and Install
+Run the following commands in the repository root directory:
+
 ```bash
-sudo pacman -R cardwire-plasmoid
-```
-
----
-
-## Manual Installation (Other Distros)
-
-If you are not using Arch Linux, you can compile and install the widget using CMake directly:
-
-```bash
-# 1. Configure the build
 cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
-
-# 2. Build the widget
 cmake --build build
-
-# 3. Install to the system
 sudo cmake --install build
 ```
 
----
+## Notes
 
-## Local Development & Testing
-
-To run the widget in a standalone window for debugging without adding it to your system panel, use `plasmoidviewer`:
-
-```bash
-plasmoidviewer -a dev.neo-aztek.cardwire
-```
+- Make sure the `cardwired` systemd service is active before launching.
+- Since it relies on `cardwire`, this widget requires Wayland.

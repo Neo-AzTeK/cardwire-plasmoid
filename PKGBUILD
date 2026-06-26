@@ -9,7 +9,7 @@ url="https://github.com/neo-aztek/cardwire-plasmoid"
 license=('GPL')
 depends=('qt6-base' 'qt6-declarative' 'ki18n' 'kconfig' 'solid' 'libplasma' 'cardwire')
 makedepends=('cmake' 'extra-cmake-modules')
-options=('!emptydirs')
+options=('!emptydirs' '!debug')
 
 build() {
   cmake -B "$srcdir/build" -S "$startdir" \
