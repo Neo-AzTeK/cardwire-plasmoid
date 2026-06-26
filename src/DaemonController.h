@@ -2,27 +2,18 @@
 #define DAEMONCONTROLLER_H
 
 #include <QObject>
-#include <QDBusConnection>
-#include <QDBusInterface>
-#include <QDBusMessage>
-#include <QDBusArgument>
-#include <QMap>
+#include <QString>
+#include <QStringList>
 #include <QList>
+#include <QQueue>
+#include <QProcess>
+#include <functional>
 #include "CardwireGpu.h"
 
-struct DbusGpuDevice {
-    QString name;
-    QString pci;
-    quint32 render;
-    quint32 card;
-    bool isDefault;
-    bool nvidia;
-    QString nvidiaMinor;
+struct CommandRequest {
+    QStringList args;
+    std::function<void(const QString &stdOut, int exitCode)> callback;
 };
-Q_DECLARE_METATYPE(DbusGpuDevice)
-
-const QDBusArgument &operator>>(const QDBusArgument &argument, DbusGpuDevice &device);
-QDBusArgument &operator<<(QDBusArgument &argument, const DbusGpuDevice &device);
 
 class DaemonController : public QObject {
     Q_OBJECT
@@ -66,11 +57,6 @@ signals:
 private:
     DaemonController();
 
-    QDBusConnection bus = QDBusConnection::systemBus();
-    QDBusInterface *modeInterface = nullptr;
-    QDBusInterface *configInterface = nullptr;
-    QDBusInterface *managerInterface = nullptr;
-
     bool m_isDaemonFailing = false;
     quint32 m_mode = 2; // Default to manual
     QList<CardwireGpu*> m_gpus;
@@ -80,12 +66,17 @@ private:
     bool m_batteryAutoSwitch = false;
     quint32 m_batteryAutoSwitchMode = 1; // Default to hybrid
 
+    QQueue<CommandRequest> m_commandQueue;
+    QProcess *m_currentProcess = nullptr;
+
+    void runCommand(const QStringList &args, std::function<void(const QString &stdOut, int exitCode)> callback);
+    void processNextCommand();
+
     void fetchMode();
     void fetchConfig();
-    void fetchGpuDynamic(CardwireGpu *gpu);
-
-private slots:
-    void onPowerStateChanged(const QString &state, const QDBusMessage &msg);
+    void fetchGpuList();
+    void fetchGpuLsof(CardwireGpu *gpu);
+    void updateGpuPowerStates();
 };
 
 #endif // DAEMONCONTROLLER_H

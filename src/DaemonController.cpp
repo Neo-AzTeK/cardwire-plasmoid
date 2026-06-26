@@ -1,55 +1,13 @@
 #include "DaemonController.h"
 #include <QTimer>
 #include <QDebug>
-#include <QDBusReply>
-#include <QDBusObjectPath>
-#include <QDBusInterface>
-#include <QDBusMetaType>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QFile>
+#include <QSet>
 #include <utility>
 
-const QDBusArgument &operator>>(const QDBusArgument &argument, DbusGpuDevice &device) {
-    argument.beginStructure();
-    argument >> device.name >> device.pci >> device.render >> device.card >> device.isDefault >> device.nvidia >> device.nvidiaMinor;
-    argument.endStructure();
-    return argument;
-}
-
-QDBusArgument &operator<<(QDBusArgument &argument, const DbusGpuDevice &device) {
-    argument.beginStructure();
-    argument << device.name << device.pci << device.render << device.card << device.isDefault << device.nvidia << device.nvidiaMinor;
-    argument.endStructure();
-    return argument;
-}
-
 DaemonController::DaemonController() {
-    qRegisterMetaType<DbusGpuDevice>("DbusGpuDevice");
-    qDBusRegisterMetaType<DbusGpuDevice>();
-
-    modeInterface = new QDBusInterface(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "com.github.opengamingcollective.cardwire.Mode",
-        bus,
-        this
-    );
-
-    configInterface = new QDBusInterface(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "com.github.opengamingcollective.cardwire.Config",
-        bus,
-        this
-    );
-
-    managerInterface = new QDBusInterface(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "com.github.opengamingcollective.cardwire.Manager",
-        bus,
-        this
-    );
-
-    refreshDevices();
     pollDaemon();
 
     auto timer = new QTimer(this);
@@ -58,299 +16,327 @@ DaemonController::DaemonController() {
     timer->start();
 }
 
-void DaemonController::refreshDevices() {
-    qDeleteAll(m_gpus);
-    m_gpus.clear();
-
-    QDBusInterface manager(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.ObjectManager",
-        bus,
-        this
-    );
-
-    QDBusReply<QMap<QDBusObjectPath, QMap<QString, QVariantMap>>> reply = manager.call("GetManagedObjects");
-    if (!reply.isValid()) {
-        m_isDaemonFailing = true;
-        emit daemonFailingChanged();
+void DaemonController::pollDaemon() {
+    if (m_commandQueue.size() > 5) {
         return;
     }
 
-    m_isDaemonFailing = false;
-    emit daemonFailingChanged();
-
-    auto objects = reply.value();
-    for (auto it = objects.begin(); it != objects.end(); ++it) {
-        QString pathStr = it.key().path();
-        if (pathStr.startsWith("/com/github/opengamingcollective/cardwire/Gpu/")) {
-            QString idStr = pathStr.mid(pathStr.lastIndexOf('/') + 1);
-            bool ok;
-            int gpuId = idStr.toInt(&ok);
-            if (ok) {
-                QDBusInterface gpuInterface(
-                    "com.github.opengamingcollective.cardwire",
-                    pathStr,
-                    "com.github.opengamingcollective.cardwire.Gpu",
-                    bus,
-                    this
-                );
-
-                QDBusReply<DbusGpuDevice> deviceReply = gpuInterface.call("GetDevice");
-                if (deviceReply.isValid()) {
-                    DbusGpuDevice rawDev = deviceReply.value();
-                    
-                    QVariant blockVal = gpuInterface.property("Block");
-                    bool isBlocked = blockVal.isValid() ? blockVal.toBool() : false;
-
-                    QDBusReply<QString> powerReply = gpuInterface.call("PowerState");
-                    QString powerState = powerReply.isValid() ? powerReply.value().trimmed() : QStringLiteral("Unknown");
-
-                    auto *gpu = new CardwireGpu(gpuId, rawDev.name, rawDev.pci, rawDev.isDefault, isBlocked, powerState, this);
-                    m_gpus.append(gpu);
-
-                    // Subscribe to power state changed signal
-                    bus.connect(
-                        "com.github.opengamingcollective.cardwire",
-                        pathStr,
-                        "com.github.opengamingcollective.cardwire.Gpu",
-                        "power_state_changed",
-                        this,
-                        SLOT(onPowerStateChanged(QString, QDBusMessage))
-                    );
-                }
+    runCommand({"manager", "status"}, [this](const QString & /*output*/, int exitCode) {
+        bool failing = (exitCode != 0);
+        if (failing != m_isDaemonFailing) {
+            m_isDaemonFailing = failing;
+            emit daemonFailingChanged();
+            if (!m_isDaemonFailing) {
+                refreshDevices();
             }
         }
-    }
-    emit gpusChanged();
+
+        if (m_isDaemonFailing) {
+            return;
+        }
+
+        fetchMode();
+        
+        if (m_gpus.isEmpty()) {
+            fetchConfig();
+            fetchGpuList();
+        } else {
+            updateGpuPowerStates();
+        }
+    });
 }
 
-void DaemonController::pollDaemon() {
-    QDBusReply<void> statusReply = managerInterface->call("Status");
-    bool failing = !statusReply.isValid();
-    if (failing != m_isDaemonFailing) {
-        m_isDaemonFailing = failing;
-        emit daemonFailingChanged();
-        if (!m_isDaemonFailing) {
-            refreshDevices();
-        }
-    }
-
+void DaemonController::refreshDevices() {
     if (m_isDaemonFailing) {
         return;
     }
-
-    fetchMode();
-    fetchConfig();
-
-    for (CardwireGpu *gpu : std::as_const(m_gpus)) {
-        fetchGpuDynamic(gpu);
-    }
+    fetchGpuList();
 }
 
-void DaemonController::fetchMode() {
-    QVariant val = modeInterface->property("Mode");
-    if (val.isValid()) {
-        quint32 mode = val.toUInt();
-        if (m_mode != mode) {
-            m_mode = mode;
-            emit modeChanged();
+void DaemonController::fetchGpuList() {
+    runCommand({"list", "--json"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+
+        QJsonParseError parseError;
+        QJsonDocument doc = QJsonDocument::fromJson(output.toUtf8(), &parseError);
+        if (doc.isNull() || !doc.isObject()) {
+            qWarning() << "Failed to parse cardwire list JSON:" << parseError.errorString();
+            return;
         }
-    }
+
+        QJsonObject obj = doc.object();
+        bool listChanged = false;
+
+        QSet<int> newIds;
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            newIds.insert(it.value().toObject().value("id").toInt());
+        }
+
+        QSet<int> currentIds;
+        for (CardwireGpu *gpu : std::as_const(m_gpus)) {
+            currentIds.insert(gpu->id());
+        }
+
+        if (newIds != currentIds) {
+            qDeleteAll(m_gpus);
+            m_gpus.clear();
+            listChanged = true;
+        }
+
+        for (auto it = obj.begin(); it != obj.end(); ++it) {
+            QJsonObject gpuObj = it.value().toObject();
+            int id = gpuObj.value("id").toInt();
+            QString name = gpuObj.value("name").toString();
+            QString pci = gpuObj.value("pci").toString();
+            bool isDefault = gpuObj.value("default").toBool();
+            bool isBlocked = gpuObj.value("blocked").toBool();
+
+            QString powerState = QStringLiteral("Unknown");
+            QFile powerFile(QStringLiteral("/sys/bus/pci/devices/%1/power_state").arg(pci));
+            if (powerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+                powerState = QString::fromUtf8(powerFile.readAll()).trimmed();
+            }
+
+            CardwireGpu *gpu = nullptr;
+            for (CardwireGpu *g : std::as_const(m_gpus)) {
+                if (g->id() == id) {
+                    gpu = g;
+                    break;
+                }
+            }
+
+            if (!gpu) {
+                gpu = new CardwireGpu(id, name, pci, isDefault, isBlocked, powerState, this);
+                m_gpus.append(gpu);
+                listChanged = true;
+            } else {
+                gpu->updateBlocked(isBlocked);
+                gpu->updatePowerState(powerState);
+            }
+
+            fetchGpuLsof(gpu);
+        }
+
+        if (listChanged) {
+            emit gpusChanged();
+        }
+    });
 }
 
-void DaemonController::fetchConfig() {
-    bool configChangedFlag = false;
+void DaemonController::fetchGpuLsof(CardwireGpu *gpu) {
+    int gpuId = gpu->id();
+    runCommand({"gpu", QString::number(gpuId), "--lsof"}, [this, gpuId](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
 
-    QVariant autoApplyVal = configInterface->property("AutoApplyGpuState");
-    if (autoApplyVal.isValid()) {
-        bool autoApply = autoApplyVal.toBool();
-        if (m_autoApplyGpuState != autoApply) {
-            m_autoApplyGpuState = autoApply;
-            configChangedFlag = true;
+        CardwireGpu *targetGpu = nullptr;
+        for (CardwireGpu *g : std::as_const(m_gpus)) {
+            if (g->id() == gpuId) {
+                targetGpu = g;
+                break;
+            }
         }
-    }
+        if (!targetGpu) return;
 
-    QVariant nvidiaBlockVal = configInterface->property("ExperimentalNvidiaBlock");
-    if (nvidiaBlockVal.isValid()) {
-        bool nvidiaBlock = nvidiaBlockVal.toBool();
-        if (m_experimentalNvidiaBlock != nvidiaBlock) {
-            m_experimentalNvidiaBlock = nvidiaBlock;
-            configChangedFlag = true;
-        }
-    }
-
-    QVariant batterySwitchVal = configInterface->property("BatteryAutoSwitch");
-    if (batterySwitchVal.isValid()) {
-        bool batterySwitch = batterySwitchVal.toBool();
-        if (m_batteryAutoSwitch != batterySwitch) {
-            m_batteryAutoSwitch = batterySwitch;
-            configChangedFlag = true;
-        }
-    }
-
-    QVariant batterySwitchModeVal = configInterface->property("BatteryAutoSwitchMode");
-    if (batterySwitchModeVal.isValid()) {
-        quint32 batterySwitchMode = batterySwitchModeVal.toUInt();
-        if (m_batteryAutoSwitchMode != batterySwitchMode) {
-            m_batteryAutoSwitchMode = batterySwitchMode;
-            configChangedFlag = true;
-        }
-    }
-
-    if (configChangedFlag) {
-        emit configChanged();
-    }
-}
-
-void DaemonController::fetchGpuDynamic(CardwireGpu *gpu) {
-    QString pathStr = QStringLiteral("/com/github/opengamingcollective/cardwire/Gpu/%1").arg(gpu->id());
-    QDBusInterface gpuInterface(
-        "com.github.opengamingcollective.cardwire",
-        pathStr,
-        "com.github.opengamingcollective.cardwire.Gpu",
-        bus,
-        this
-    );
-
-    // Sync block state
-    QVariant blockVal = gpuInterface.property("Block");
-    if (blockVal.isValid()) {
-        gpu->updateBlocked(blockVal.toBool());
-    }
-
-    // Sync power state
-    QDBusReply<QString> powerReply = gpuInterface.call("PowerState");
-    if (powerReply.isValid()) {
-        gpu->updatePowerState(powerReply.value());
-    }
-
-    // Sync active applications (lsof)
-    QDBusReply<QMap<QString, QStringList>> lsofReply = gpuInterface.call("Lsof");
-    if (lsofReply.isValid()) {
-        auto processMap = lsofReply.value();
         QSet<QString> uniqueApps;
-        for (auto it = processMap.begin(); it != processMap.end(); ++it) {
-            for (const QString &app : it.value()) {
-                if (!app.trimmed().isEmpty()) {
-                    uniqueApps.insert(app.trimmed());
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        for (const QString &line : lines) {
+            int colonIdx = line.indexOf(':');
+            if (colonIdx != -1) {
+                QString arrayPart = line.mid(colonIdx + 1).trimmed();
+                if (arrayPart.startsWith('[') && arrayPart.endsWith(']')) {
+                    QString content = arrayPart.mid(1, arrayPart.length() - 2);
+                    QStringList apps = content.split(',', Qt::SkipEmptyParts);
+                    for (const QString &app : apps) {
+                        QString cleanedApp = app.trimmed();
+                        if (cleanedApp.startsWith('"') && cleanedApp.endsWith('"')) {
+                            cleanedApp = cleanedApp.mid(1, cleanedApp.length() - 2);
+                        }
+                        if (!cleanedApp.isEmpty()) {
+                            uniqueApps.insert(cleanedApp);
+                        }
+                    }
                 }
             }
         }
-        
+
         int count = uniqueApps.size();
         QStringList sortedApps = uniqueApps.values();
         sortedApps.sort();
         QString details = sortedApps.join(QStringLiteral("\n"));
-        gpu->updateApps(count, details);
-    }
+        targetGpu->updateApps(count, details);
+    });
+}
+
+void DaemonController::fetchMode() {
+    runCommand({"get"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+
+        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+        for (const QString &line : lines) {
+            if (line.startsWith(QLatin1String("Current Mode:"))) {
+                QString modeStr = line.mid(13).trimmed().toLower();
+                quint32 mode = 2; // Default to manual
+                if (modeStr == QLatin1String("integrated")) mode = 0;
+                else if (modeStr == QLatin1String("hybrid")) mode = 1;
+                else if (modeStr == QLatin1String("manual")) mode = 2;
+                else if (modeStr == QLatin1String("smart")) mode = 3;
+
+                if (m_mode != mode) {
+                    m_mode = mode;
+                    emit modeChanged();
+                }
+                break;
+            }
+        }
+    });
+}
+
+void DaemonController::fetchConfig() {
+    runCommand({"config", "auto-apply-gpu-state"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+        if (output.contains("true")) {
+            if (!m_autoApplyGpuState) { m_autoApplyGpuState = true; emit configChanged(); }
+        } else if (output.contains("false")) {
+            if (m_autoApplyGpuState) { m_autoApplyGpuState = false; emit configChanged(); }
+        }
+    });
+
+    runCommand({"config", "experimental-nvidia-block"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+        if (output.contains("true")) {
+            if (!m_experimentalNvidiaBlock) { m_experimentalNvidiaBlock = true; emit configChanged(); }
+        } else if (output.contains("false")) {
+            if (m_experimentalNvidiaBlock) { m_experimentalNvidiaBlock = false; emit configChanged(); }
+        }
+    });
+
+    runCommand({"config", "battery-auto-switch"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+        if (output.contains("true")) {
+            if (!m_batteryAutoSwitch) { m_batteryAutoSwitch = true; emit configChanged(); }
+        } else if (output.contains("false")) {
+            if (m_batteryAutoSwitch) { m_batteryAutoSwitch = false; emit configChanged(); }
+        }
+    });
+
+    runCommand({"config", "battery-auto-switch-mode"}, [this](const QString &output, int exitCode) {
+        if (exitCode != 0) return;
+        QString modeStr = output.mid(output.indexOf(':') + 1).trimmed().toLower();
+        quint32 mode = 1; // Default to hybrid
+        if (modeStr == QLatin1String("integrated")) mode = 0;
+        else if (modeStr == QLatin1String("hybrid")) mode = 1;
+        else if (modeStr == QLatin1String("manual")) mode = 2;
+        else if (modeStr == QLatin1String("smart")) mode = 3;
+
+        if (m_batteryAutoSwitchMode != mode) {
+            m_batteryAutoSwitchMode = mode;
+            emit configChanged();
+        }
+    });
 }
 
 void DaemonController::setMode(quint32 mode) {
-    // Mode is a writable property
-    QDBusPendingCall pendingCall = modeInterface->asyncCall("set_mode", mode); // Wait, properties setters in QDBusInterface are call("set_mode", val) or usingsetProperty?
-    // Wait, in QDBusInterface, it is safer to use: modeInterface->setProperty("Mode", mode);
-    // Let's call configInterface->setProperty or modeInterface->setProperty directly!
-    // But setProperty is synchronous. Async is better if possible.
-    // Wait! QDBusInterface inherits QDBusAbstractInterface.
-    // In QDBusAbstractInterface:
-    // QDBusPendingCall asyncCall(const QString &method, const QVariant &arg1 = ...)
-    // Wait, the property setter for property "Mode" is not a method "set_mode". In DBus, properties are set via the org.freedesktop.DBus.Properties interface!
-    // So we can use:
-    // QDBusInterface propertiesInterface("com.github.opengamingcollective.cardwire", "/com/github/opengamingcollective/cardwire", "org.freedesktop.DBus.Properties", bus, this);
-    // propertiesInterface.asyncCall("Set", "com.github.opengamingcollective.cardwire.Mode", "Mode", QVariant::fromValue(QDBusVariant(mode)));
-    // Or we can use QDBusInterface::setProperty("Mode", mode) which handles Properties.Set automatically under the hood!
-    // Wait, is setProperty async or sync? setProperty() is synchronous, but it is extremely short and fast, and for a Plasmoid GUI thread it's perfectly fine.
-    // However, if we want to be safe, we can do it via the standard Qt interface->setProperty("Mode", mode) or async call to "org.freedesktop.DBus.Properties".
-    // Let's use propertiesInterface.asyncCall as it's non-blocking and very clean!
-    // Let's look:
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Mode", "Mode", QVariant::fromValue(QDBusVariant(mode)));
-    
-    // We can poll mode immediately to update UI quickly
-    QTimer::singleShot(500, this, [this]() {
+    QString modeStr;
+    switch (mode) {
+        case 0: modeStr = QLatin1String("integrated"); break;
+        case 1: modeStr = QLatin1String("hybrid"); break;
+        case 2: modeStr = QLatin1String("manual"); break;
+        case 3: modeStr = QLatin1String("smart"); break;
+        default: modeStr = QLatin1String("manual"); break;
+    }
+
+    runCommand({"set", modeStr}, [this](const QString & /*output*/, int /*exitCode*/) {
         fetchMode();
         emit setModeFinished();
     });
 }
 
 void DaemonController::setGpuBlocked(int id, bool blocked) {
-    QString pathStr = QStringLiteral("/com/github/opengamingcollective/cardwire/Gpu/%1").arg(id);
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        pathStr,
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Gpu", "Block", QVariant::fromValue(QDBusVariant(blocked)));
+    runCommand({"gpu", QString::number(id), blocked ? "--block" : "--unblock"}, [this](const QString & /*output*/, int /*exitCode*/) {
+        fetchGpuList();
+    });
 }
 
 void DaemonController::setAutoApplyGpuState(bool state) {
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Config", "AutoApplyGpuState", QVariant::fromValue(QDBusVariant(state)));
-    QTimer::singleShot(200, this, &DaemonController::fetchConfig);
+    runCommand({"config", "auto-apply-gpu-state", state ? "true" : "false"}, [this](const QString & /*output*/, int /*exitCode*/) {
+        runCommand({"config", "save"}, [this](const QString & /*output*/, int /*exitCode*/) {
+            fetchConfig();
+        });
+    });
 }
 
 void DaemonController::setExperimentalNvidiaBlock(bool state) {
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Config", "ExperimentalNvidiaBlock", QVariant::fromValue(QDBusVariant(state)));
-    QTimer::singleShot(200, this, &DaemonController::fetchConfig);
+    runCommand({"config", "experimental-nvidia-block", state ? "true" : "false"}, [this](const QString & /*output*/, int /*exitCode*/) {
+        runCommand({"config", "save"}, [this](const QString & /*output*/, int /*exitCode*/) {
+            fetchConfig();
+        });
+    });
 }
 
 void DaemonController::setBatteryAutoSwitch(bool state) {
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Config", "BatteryAutoSwitch", QVariant::fromValue(QDBusVariant(state)));
-    QTimer::singleShot(200, this, &DaemonController::fetchConfig);
+    runCommand({"config", "battery-auto-switch", state ? "true" : "false"}, [this](const QString & /*output*/, int /*exitCode*/) {
+        runCommand({"config", "save"}, [this](const QString & /*output*/, int /*exitCode*/) {
+            fetchConfig();
+        });
+    });
 }
 
 void DaemonController::setBatteryAutoSwitchMode(quint32 mode) {
-    QDBusInterface properties(
-        "com.github.opengamingcollective.cardwire",
-        "/com/github/opengamingcollective/cardwire",
-        "org.freedesktop.DBus.Properties",
-        bus,
-        this
-    );
-    properties.call("Set", "com.github.opengamingcollective.cardwire.Config", "BatteryAutoSwitchMode", QVariant::fromValue(QDBusVariant(mode)));
-    QTimer::singleShot(200, this, &DaemonController::fetchConfig);
+    QString modeStr;
+    switch (mode) {
+        case 0: modeStr = QLatin1String("integrated"); break;
+        case 1: modeStr = QLatin1String("hybrid"); break;
+        case 2: modeStr = QLatin1String("manual"); break;
+        case 3: modeStr = QLatin1String("smart"); break;
+        default: modeStr = QLatin1String("hybrid"); break;
+    }
+    runCommand({"config", "battery-auto-switch-mode", modeStr}, [this](const QString & /*output*/, int /*exitCode*/) {
+        runCommand({"config", "save"}, [this](const QString & /*output*/, int /*exitCode*/) {
+            fetchConfig();
+        });
+    });
 }
 
-void DaemonController::onPowerStateChanged(const QString &state, const QDBusMessage &msg) {
-    QString path = msg.path();
-    QString idStr = path.mid(path.lastIndexOf('/') + 1);
-    bool ok;
-    int gpuId = idStr.toInt(&ok);
-    if (ok) {
-        for (CardwireGpu *gpu : std::as_const(m_gpus)) {
-            if (gpu->id() == gpuId) {
-                gpu->updatePowerState(state);
-                break;
-            }
+void DaemonController::runCommand(const QStringList &args, std::function<void(const QString &stdOut, int exitCode)> callback) {
+    m_commandQueue.enqueue({args, callback});
+    if (!m_currentProcess) {
+        processNextCommand();
+    }
+}
+
+void DaemonController::processNextCommand() {
+    if (m_commandQueue.isEmpty()) {
+        return;
+    }
+
+    CommandRequest req = m_commandQueue.dequeue();
+    m_currentProcess = new QProcess(this);
+    QProcess *proc = m_currentProcess;
+
+    connect(proc, &QProcess::finished, this, [this, req, proc](int exitCode, QProcess::ExitStatus /*exitStatus*/) {
+        QString output = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+        proc->deleteLater();
+        if (m_currentProcess == proc) {
+            m_currentProcess = nullptr;
         }
+
+        req.callback(output, exitCode);
+
+        if (!m_currentProcess) {
+            processNextCommand();
+        }
+    });
+
+    m_currentProcess->start("cardwire", req.args);
+}
+
+void DaemonController::updateGpuPowerStates() {
+    for (CardwireGpu *gpu : std::as_const(m_gpus)) {
+        QString powerState = QStringLiteral("Unknown");
+        QFile powerFile(QStringLiteral("/sys/bus/pci/devices/%1/power_state").arg(gpu->pci()));
+        if (powerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            powerState = QString::fromUtf8(powerFile.readAll()).trimmed();
+        }
+        gpu->updatePowerState(powerState);
     }
 }

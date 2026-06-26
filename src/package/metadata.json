@@ -21,6 +21,5 @@
     },
     "KPackageStructure": "Plasma/Applet",
     "X-Plasma-API-Minimum-Version": "6.0",
-    "X-Plasma-DBusActivationService": "com.github.opengamingcollective.cardwire",
     "X-Plasma-NotificationAreaCategory": "Hardware"
 }

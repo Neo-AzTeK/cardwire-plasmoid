@@ -170,25 +170,20 @@ PlasmoidItem {
             }
         }
 
-        ColumnLayout {
+        // Daemon failing banner
+        PlasmaExtras.PlaceholderMessage {
+            anchors.centerIn: parent
+            width: parent.width - Kirigami.Units.gridUnit * 2
+            visible: plasmoid.isDaemonFailing
+            iconName: "network-disconnect"
+            text: i18n("Cannot connect to cardwired daemon")
+            explanation: i18n("Please ensure that cardwired systemd service is active.")
+        }
+
+        // Normal UI
+        ScrollView {
             anchors.fill: parent
-            spacing: Kirigami.Units.smallSpacing
-
-            // Daemon failing banner
-            PlasmaExtras.PlaceholderMessage {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: plasmoid.isDaemonFailing
-                iconName: "network-disconnect"
-                text: i18n("Cannot connect to cardwired daemon")
-                explanation: i18n("Please ensure that cardwired systemd service is active.")
-            }
-
-            // Normal UI
-            ScrollView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                visible: !plasmoid.isDaemonFailing
+            visible: !plasmoid.isDaemonFailing
 
                 ColumnLayout {
                     width: parent.width - Kirigami.Units.gridUnit
@@ -216,28 +211,19 @@ PlasmoidItem {
 
                             ColumnLayout {
                                 spacing: 2
+                                Layout.fillWidth: true
                                 PlasmaComponents.Label {
-                                    text: modelData.name
+                                    text: modelData.name + (modelData.isDefault ? " (" + i18n("Default") + ")" : " (" + i18n("Discrete") + ")")
                                     font.bold: true
                                     elide: Text.ElideRight
                                     Layout.fillWidth: true
                                 }
                                 PlasmaComponents.Label {
-                                    text: i18n("PCI: %1 | %2", modelData.pci, modelData.isDefault ? i18n("Default") : i18n("Discrete"))
+                                    text: i18n("Power: %1 | %2", modelData.powerState, modelData.appCount > 0 ? i18np("%1 active process", "%1 active processes", modelData.appCount) : i18n("No active processes"))
                                     font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                     opacity: 0.7
-                                }
-                                PlasmaComponents.Label {
-                                    text: i18n("Power State: %1", modelData.powerState)
-                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                    opacity: 0.7
-                                }
-                                PlasmaComponents.Label {
-                                    text: modelData.appCount > 0 ? i18np("%1 active process", "%1 active processes", modelData.appCount) : i18n("No active processes")
-                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                    font.italic: true
-                                    opacity: 0.8
                                     color: modelData.appCount > 0 ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                                    Layout.fillWidth: true
 
                                     // Hover processes list tooltip
                                     ToolTip {
@@ -252,8 +238,6 @@ PlasmoidItem {
                                     }
                                 }
                             }
-
-                            Item { Layout.fillWidth: true }
 
                             PlasmaComponents.CheckBox {
                                 visible: !modelData.isDefault && plasmoid.mode === 2 // Only toggle discrete GPU in manual mode
@@ -292,10 +276,10 @@ PlasmoidItem {
                             }
 
                             delegate: MouseArea {
-                                Layout.fillWidth: true
-                                height: layoutRow.implicitHeight + Kirigami.Units.gridUnit
-                                hoverEnabled: true
                                 id: modeDelegate
+                                Layout.fillWidth: true
+                                implicitHeight: layoutRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+                                hoverEnabled: true
                                 required property int modeId
                                 required property string name
                                 required property string icon
@@ -311,7 +295,9 @@ PlasmoidItem {
 
                                 RowLayout {
                                     id: layoutRow
-                                    anchors.fill: parent
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
                                     anchors.margins: Kirigami.Units.smallSpacing
                                     spacing: Kirigami.Units.gridUnit
 
@@ -349,6 +335,5 @@ PlasmoidItem {
                     }
                 }
             }
-        }
     }
 }
