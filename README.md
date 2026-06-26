@@ -65,5 +65,5 @@ sudo cmake --install build
 To run the widget in a standalone window for debugging without adding it to your system panel, use `plasmoidviewer`:
 
 ```bash
-plasmoidviewer -a dev.opengamingcollective.cardwire
+plasmoidviewer -a dev.neo-aztek.cardwire
 ```

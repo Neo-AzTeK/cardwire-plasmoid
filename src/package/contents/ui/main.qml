@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 Open Gaming Collective <info@opengamingcollective.github.io>
+    SPDX-FileCopyrightText: 2026 neo-aztek <info@neo-aztek.github.io>
     SPDX-License-Identifier: GPL-3.0
 */
 

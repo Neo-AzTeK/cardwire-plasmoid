@@ -33,7 +33,7 @@ cmake --build build
 sudo cmake --install build
 ```
 
-The compiled binary module `dev.opengamingcollective.cardwire.so` is installed to `${KDE_INSTALL_QTPLUGINDIR}/plasma/applets/` (usually `/usr/lib/qt6/plugins/plasma/applets/`), and QML configurations are installed to `/usr/share/plasma/plasmoids/dev.opengamingcollective.cardwire/`.
+The compiled binary module `dev.neo-aztek.cardwire.so` is installed to `${KDE_INSTALL_QTPLUGINDIR}/plasma/applets/` (usually `/usr/lib/qt6/plugins/plasma/applets/`), and QML configurations are installed to `/usr/share/plasma/plasmoids/dev.neo-aztek.cardwire/`.
 
 ---
 
@@ -66,7 +66,7 @@ sudo pacman -R cardwire-plasmoid
 To test the widget without adding it to your system panel, you can launch it in a standalone window using KDE's `plasmoidviewer` utility:
 
 ```bash
-plasmoidviewer -a dev.opengamingcollective.cardwire
+plasmoidviewer -a dev.neo-aztek.cardwire
 ```
 
 If you make QML styling edits and want to test them immediately, reinstall the package and relaunch `plasmoidviewer`.

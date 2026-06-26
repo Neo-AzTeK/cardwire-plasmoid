@@ -2,8 +2,8 @@
     "KPlugin": {
         "Authors": [
             {
-                "Email": "info@opengamingcollective.github.io",
-                "Name": "Open Gaming Collective"
+                "Email": "info@neo-aztek.github.io",
+                "Name": "neo-aztek"
             }
         ],
         "Category": "Utilities",
@@ -13,12 +13,12 @@
             "desktop"
         ],
         "Icon": "cardwire-plasmoid-gpu-integrated",
-        "Id": "dev.opengamingcollective.cardwire",
+        "Id": "dev.neo-aztek.cardwire",
         "License": "GPL-3.0",
         "Name": "Cardwire",
         "NoDisplay": true,
         "Version": "0.1.0",
-        "Website": "https://github.com/OpenGamingCollective/cardwire"
+        "Website": "https://github.com/neo-aztek/cardwire"
     },
     "KPackageStructure": "Plasma/Applet",
     "X-Plasma-API-Minimum-Version": "6.0",

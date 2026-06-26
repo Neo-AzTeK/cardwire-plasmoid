@@ -1,6 +1,6 @@
-add_compile_definitions(TRANSLATION_DOMAIN="plasma_applet_dev.opengamingcollective.cardwire")
+add_compile_definitions(TRANSLATION_DOMAIN="plasma_applet_dev.neo-aztek.cardwire")
 
-add_library(dev.opengamingcollective.cardwire MODULE
+add_library(dev.neo-aztek.cardwire MODULE
     CardwireApplet.cpp
     CardwireApplet.h
     DaemonController.cpp
@@ -9,7 +9,7 @@ add_library(dev.opengamingcollective.cardwire MODULE
     CardwireGpu.h
 )
 
-target_link_libraries(dev.opengamingcollective.cardwire
+target_link_libraries(dev.neo-aztek.cardwire
     Qt6::Gui
     Qt6::Qml
     Qt6::DBus
@@ -18,6 +18,6 @@ target_link_libraries(dev.opengamingcollective.cardwire
     KF6::Solid
 )
 
-install(TARGETS dev.opengamingcollective.cardwire DESTINATION ${KDE_INSTALL_QTPLUGINDIR}/plasma/applets)
+install(TARGETS dev.neo-aztek.cardwire DESTINATION ${KDE_INSTALL_QTPLUGINDIR}/plasma/applets)
 
-plasma_install_package(package dev.opengamingcollective.cardwire)
+plasma_install_package(package dev.neo-aztek.cardwire)
