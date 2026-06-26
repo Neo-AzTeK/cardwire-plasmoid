@@ -18,6 +18,6 @@ target_link_libraries(dev.opengamingcollective.cardwire
     KF6::Solid
 )
 
-install(TARGETS dev.opengamingcollective.cardwire DESTINATION ${KDE_INSTALL_PLUGINDIR}/plasma/applets)
+install(TARGETS dev.opengamingcollective.cardwire DESTINATION ${KDE_INSTALL_QTPLUGINDIR}/plasma/applets)
 
 plasma_install_package(package dev.opengamingcollective.cardwire)
