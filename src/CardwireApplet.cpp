@@ -35,12 +35,12 @@ quint32 CardwireApplet::mode() const {
     return DaemonController::from().mode();
 }
 
-QList<QObject*> CardwireApplet::gpus() const {
-    QList<QObject*> list;
+QVariantList CardwireApplet::gpus() const {
+    QVariantList list;
     const auto &gpus = DaemonController::from().gpus();
     for (auto *gpu : gpus) {
         connect(gpu, &CardwireGpu::powerStateChanged, this, &CardwireApplet::iconNameChanged, Qt::UniqueConnection);
-        list.append(gpu);
+        list.append(QVariant::fromValue(gpu));
     }
     return list;
 }

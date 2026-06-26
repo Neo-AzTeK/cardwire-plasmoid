@@ -3,13 +3,14 @@
 
 #include <Plasma/Applet>
 #include <Solid/Battery>
+#include <QVariantList>
 #include "DaemonController.h"
 
 class CardwireApplet : public Plasma::Applet {
     Q_OBJECT
     Q_PROPERTY(bool isDaemonFailing READ isDaemonFailing NOTIFY daemonFailingChanged)
     Q_PROPERTY(quint32 mode READ mode NOTIFY modeChanged)
-    Q_PROPERTY(QList<QObject*> gpus READ gpus NOTIFY gpusChanged)
+    Q_PROPERTY(QVariantList gpus READ gpus NOTIFY gpusChanged)
     Q_PROPERTY(QString iconName READ iconName NOTIFY iconNameChanged)
     Q_PROPERTY(bool isCharging READ isCharging NOTIFY chargingChanged)
 
@@ -25,7 +26,7 @@ public:
 
     bool isDaemonFailing() const;
     quint32 mode() const;
-    QList<QObject*> gpus() const;
+    QVariantList gpus() const;
     QString iconName() const;
     bool isCharging() const;
 
