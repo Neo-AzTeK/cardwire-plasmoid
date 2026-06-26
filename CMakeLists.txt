@@ -20,7 +20,7 @@ include(FindGettext)
 
 add_subdirectory(src)
 
-install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/icons/status
+install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/icons
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable
         FILES_MATCHING PATTERN "*.svg"
         )
