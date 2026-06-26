@@ -6,6 +6,7 @@ import org.kde.plasma.components as PlasmaComponents
 
 Kirigami.FormLayout {
     id: page
+    property string title: i18n("General")
 
     Kirigami.Separator {
         Kirigami.FormData.isSection: true
@@ -39,7 +40,7 @@ Kirigami.FormLayout {
         id: batteryAutoSwitchModeCombo
         visible: batteryAutoSwitchChk.checked
         Kirigami.FormData.label: i18n("On AC Mode:")
-        model: ["Integrated", "Hybrid", "Manual", "Smart"]
+        model: [i18n("Integrated"), i18n("Hybrid"), i18n("Manual"), i18n("Smart")]
         currentIndex: {
             switch (plasmoid.batteryAutoSwitchMode) {
                 case 0: return 0;

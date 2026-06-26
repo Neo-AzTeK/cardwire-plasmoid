@@ -28,19 +28,19 @@ PlasmoidItem {
         }
         var modeName = "";
         switch (plasmoid.mode) {
-            case 0: modeName = "Integrated"; break;
-            case 1: modeName = "Hybrid"; break;
-            case 2: modeName = "Manual"; break;
-            case 3: modeName = "Smart"; break;
-            default: modeName = "Manual"; break;
+            case 0: modeName = i18n("Integrated"); break;
+            case 1: modeName = i18n("Hybrid"); break;
+            case 2: modeName = i18n("Manual"); break;
+            case 3: modeName = i18n("Smart"); break;
+            default: modeName = i18n("Manual"); break;
         }
         return i18n("Graphics Mode: %1", modeName);
     }
 
     compactRepresentation: MouseArea {
         property bool wasExpanded
-        onPressed: wasExpanded = mainWindow.expanded
-        onClicked: mainWindow.expanded = !wasExpanded
+        onPressed: (mouse) => wasExpanded = mainWindow.expanded
+        onClicked: (mouse) => mainWindow.expanded = !wasExpanded
         hoverEnabled: true
 
         Kirigami.Icon {
@@ -166,11 +166,11 @@ PlasmoidItem {
                                     spacing: 2
                                     Layout.fillWidth: true
                                     PlasmaComponents.Label {
-                                        text: name
+                                        text: i18n(name)
                                         font.bold: true
                                     }
                                     PlasmaComponents.Label {
-                                        text: desc
+                                        text: i18n(desc)
                                         font.pixelSize: Kirigami.Theme.smallFont.pixelSize
                                         opacity: 0.7
                                         wrapMode: Text.Wrap
@@ -183,7 +183,7 @@ PlasmoidItem {
                                     flat: true
                                     down: plasmoid.mode === modeId
                                     enabled: plasmoid.mode !== modeId
-                                    onClicked: plasmoid.setMode(modeId)
+                                    onClicked: (mouse) => plasmoid.setMode(modeId)
                                 }
                             }
                         }
