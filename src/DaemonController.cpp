@@ -6,6 +6,9 @@
 #include <QFile>
 #include <QSet>
 #include <utility>
+#include <QStandardPaths>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
 
 DaemonController::DaemonController() {
     pollDaemon();
@@ -17,33 +20,35 @@ DaemonController::DaemonController() {
 }
 
 void DaemonController::pollDaemon() {
+    bool hasCli = !QStandardPaths::findExecutable(QStringLiteral("cardwire")).isEmpty();
+    bool hasDaemon = QDBusConnection::systemBus().interface() &&
+                     QDBusConnection::systemBus().interface()->isServiceRegistered(QStringLiteral("com.github.opengamingcollective.cardwire"));
+
+    bool failing = (!hasCli || !hasDaemon);
+    if (failing != m_isDaemonFailing) {
+        m_isDaemonFailing = failing;
+        emit daemonFailingChanged();
+        if (!m_isDaemonFailing) {
+            refreshDevices();
+        }
+    }
+
+    if (m_isDaemonFailing) {
+        return;
+    }
+
     if (m_commandQueue.size() > 5) {
         return;
     }
 
-    runCommand({"manager", "status"}, [this](const QString & /*output*/, int exitCode) {
-        bool failing = (exitCode != 0);
-        if (failing != m_isDaemonFailing) {
-            m_isDaemonFailing = failing;
-            emit daemonFailingChanged();
-            if (!m_isDaemonFailing) {
-                refreshDevices();
-            }
-        }
-
-        if (m_isDaemonFailing) {
-            return;
-        }
-
-        fetchMode();
-        
-        if (m_gpus.isEmpty()) {
-            fetchConfig();
-            fetchGpuList();
-        } else {
-            updateGpuPowerStates();
-        }
-    });
+    fetchMode();
+    
+    if (m_gpus.isEmpty()) {
+        fetchConfig();
+        fetchGpuList();
+    } else {
+        updateGpuPowerStates();
+    }
 }
 
 void DaemonController::refreshDevices() {

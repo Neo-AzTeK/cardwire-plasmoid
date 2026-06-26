@@ -12,6 +12,7 @@ add_library(dev.opengamingcollective.cardwire MODULE
 target_link_libraries(dev.opengamingcollective.cardwire
     Qt6::Gui
     Qt6::Qml
+    Qt6::DBus
     Plasma::Plasma
     KF6::I18n
     KF6::Solid

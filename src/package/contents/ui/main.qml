@@ -237,6 +237,7 @@ PlasmoidItem {
                                 text: i18n("Block")
                                 checked: modelData.isBlocked
                                 enabled: !modelData.isDefault
+                                hoverEnabled: enabled
                                 onToggled: modelData.isBlocked = checked
                             }
                         }
