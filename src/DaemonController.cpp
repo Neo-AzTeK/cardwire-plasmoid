@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QSet>
 #include <utility>
+#include <QHash>
 #include <QStandardPaths>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
@@ -17,6 +18,26 @@ DaemonController::DaemonController() {
     connect(timer, &QTimer::timeout, this, &DaemonController::pollDaemon);
     timer->setInterval(2000);
     timer->start();
+}
+
+GpuMode DaemonController::modeFromString(const QString &str) {
+    static const QHash<QString, GpuMode> modeMap {
+        { QStringLiteral("integrated"), GpuMode::Integrated },
+        { QStringLiteral("hybrid"), GpuMode::Hybrid },
+        { QStringLiteral("manual"), GpuMode::Manual },
+        { QStringLiteral("smart"), GpuMode::Smart }
+    };
+    return modeMap.value(str.trimmed().toLower(), GpuMode::Manual);
+}
+
+QString DaemonController::modeToString(GpuMode mode) {
+    switch (mode) {
+        case GpuMode::Integrated: return QStringLiteral("integrated");
+        case GpuMode::Hybrid:     return QStringLiteral("hybrid");
+        case GpuMode::Manual:     return QStringLiteral("manual");
+        case GpuMode::Smart:      return QStringLiteral("smart");
+        default:                  return QStringLiteral("manual");
+    }
 }
 
 void DaemonController::pollDaemon() {
@@ -133,12 +154,8 @@ void DaemonController::fetchMode() {
         QStringList lines = output.split('\n', Qt::SkipEmptyParts);
         for (const QString &line : lines) {
             if (line.startsWith(QLatin1String("Current Mode:"))) {
-                QString modeStr = line.mid(13).trimmed().toLower();
-                quint32 mode = 2; // Default to manual
-                if (modeStr == QLatin1String("integrated")) mode = 0;
-                else if (modeStr == QLatin1String("hybrid")) mode = 1;
-                else if (modeStr == QLatin1String("manual")) mode = 2;
-                else if (modeStr == QLatin1String("smart")) mode = 3;
+                QString modeStr = line.mid(13).trimmed();
+                GpuMode mode = modeFromString(modeStr);
 
                 if (m_mode != mode) {
                     m_mode = mode;
@@ -180,12 +197,8 @@ void DaemonController::fetchConfig() {
 
     runCommand({"config", "battery-auto-switch-mode"}, [this](const QString &output, int exitCode) {
         if (exitCode != 0) return;
-        QString modeStr = output.mid(output.indexOf(':') + 1).trimmed().toLower();
-        quint32 mode = 1; // Default to hybrid
-        if (modeStr == QLatin1String("integrated")) mode = 0;
-        else if (modeStr == QLatin1String("hybrid")) mode = 1;
-        else if (modeStr == QLatin1String("manual")) mode = 2;
-        else if (modeStr == QLatin1String("smart")) mode = 3;
+        QString modeStr = output.mid(output.indexOf(':') + 1).trimmed();
+        GpuMode mode = modeFromString(modeStr);
 
         if (m_batteryAutoSwitchMode != mode) {
             m_batteryAutoSwitchMode = mode;
@@ -195,15 +208,7 @@ void DaemonController::fetchConfig() {
 }
 
 void DaemonController::setMode(quint32 mode) {
-    QString modeStr;
-    switch (mode) {
-        case 0: modeStr = QLatin1String("integrated"); break;
-        case 1: modeStr = QLatin1String("hybrid"); break;
-        case 2: modeStr = QLatin1String("manual"); break;
-        case 3: modeStr = QLatin1String("smart"); break;
-        default: modeStr = QLatin1String("manual"); break;
-    }
-
+    QString modeStr = modeToString(static_cast<GpuMode>(mode));
     runCommand({"set", modeStr}, [this](const QString & /*output*/, int /*exitCode*/) {
         fetchMode();
     });
@@ -240,14 +245,7 @@ void DaemonController::setBatteryAutoSwitch(bool state) {
 }
 
 void DaemonController::setBatteryAutoSwitchMode(quint32 mode) {
-    QString modeStr;
-    switch (mode) {
-        case 0: modeStr = QLatin1String("integrated"); break;
-        case 1: modeStr = QLatin1String("hybrid"); break;
-        case 2: modeStr = QLatin1String("manual"); break;
-        case 3: modeStr = QLatin1String("smart"); break;
-        default: modeStr = QLatin1String("hybrid"); break;
-    }
+    QString modeStr = modeToString(static_cast<GpuMode>(mode));
     runCommand({"config", "battery-auto-switch-mode", modeStr}, [this](const QString & /*output*/, int /*exitCode*/) {
         runCommand({"config", "save"}, [this](const QString & /*output*/, int /*exitCode*/) {
             fetchConfig();
