@@ -27,10 +27,3 @@ void CardwireGpu::updatePowerState(const QString &state) {
     }
 }
 
-void CardwireGpu::updateApps(int count, const QString &details) {
-    if (m_appCount != count || m_appDetails != details) {
-        m_appCount = count;
-        m_appDetails = details;
-        emit appsChanged();
-    }
-}

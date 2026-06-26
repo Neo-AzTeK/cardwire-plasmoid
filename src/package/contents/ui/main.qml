@@ -19,31 +19,7 @@ PlasmoidItem {
     switchWidth: Kirigami.Units.gridUnit * 12
     switchHeight: Kirigami.Units.gridUnit * 12
 
-    Binding {
-        target: plasmoid
-        property: "status"
-
-        // Determine tray icon active status dynamically
-        function isPlasmoidActive() {
-            if (plasmoid.isDaemonFailing) {
-                return PlasmaCore.Types.ActiveStatus;
-            }
-            // Check if any discrete GPU is active (D0)
-            var dGpuActive = false;
-            for (var i = 0; i < plasmoid.gpus.length; ++i) {
-                var gpu = plasmoid.gpus[i];
-                if (!gpu.isDefault) {
-                    var powerState = gpu.powerState.trim().toLowerCase();
-                    if (powerState !== "d3cold" && powerState !== "unknown") {
-                        dGpuActive = true;
-                    }
-                }
-            }
-            return dGpuActive ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus;
-        }
-
-        value: isPlasmoidActive()
-    }
+    Plasmoid.status: PlasmaCore.Types.ActiveStatus
 
     toolTipMainText: i18n("Cardwire GPU Manager")
     toolTipSubText: {
@@ -78,95 +54,48 @@ PlasmoidItem {
         id: dialog
         anchors.fill: parent
         Layout.minimumWidth: Kirigami.Units.gridUnit * 18
-        Layout.minimumHeight: Kirigami.Units.gridUnit * 22
+        Layout.minimumHeight: Kirigami.Units.gridUnit * 15
 
         header: PlasmaExtras.PlasmoidHeading {
             visible: !plasmoid.isDaemonFailing
-            ColumnLayout {
-                spacing: Kirigami.Units.smallSpacing
+            RowLayout {
+                spacing: Kirigami.Units.largeSpacing
                 Layout.fillWidth: true
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: i18n("Cardwire Status")
-                        font.bold: true
-                        font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.2
-                    }
-                    Item { Layout.fillWidth: true }
-                    PlasmaComponents.ToolButton {
-                        icon.name: "view-refresh"
-                        text: i18n("Refresh Devices")
-                        onClicked: plasmoid.refreshDevices()
-                    }
-                }
-
-                // Collapsible settings
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 0
-
-                    PlasmaComponents.Button {
-                        id: configToggle
-                        text: expanded ? i18n("Hide Config Options") : i18n("Show Config Options")
-                        icon.name: expanded ? "arrow-up" : "settings-configure"
-                        flat: true
-                        Layout.fillWidth: true
-                        property bool expanded: false
-                        onClicked: expanded = !expanded
-                    }
-
-                    ColumnLayout {
-                        visible: configToggle.expanded
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.gridUnit
-                        Layout.bottomMargin: Kirigami.Units.smallSpacing
+                Repeater {
+                    model: plasmoid.gpus
+                    delegate: RowLayout {
                         spacing: Kirigami.Units.smallSpacing
 
-                        PlasmaComponents.CheckBox {
-                            text: i18n("Auto-apply GPU Block in Manual Mode")
-                            checked: plasmoid.autoApplyGpuState
-                            onToggled: plasmoid.autoApplyGpuState = checked
-                        }
-
-                        PlasmaComponents.CheckBox {
-                            text: i18n("Experimental NVIDIA Block")
-                            checked: plasmoid.experimentalNvidiaBlock
-                            onToggled: plasmoid.experimentalNvidiaBlock = checked
-                        }
-
-                        PlasmaComponents.CheckBox {
-                            id: batterySwitchChk
-                            text: i18n("Battery Auto-switching")
-                            checked: plasmoid.batteryAutoSwitch
-                            onToggled: plasmoid.batteryAutoSwitch = checked
-                        }
-
-                        RowLayout {
-                            visible: batterySwitchChk.checked
-                            Layout.leftMargin: Kirigami.Units.gridUnit
-                            PlasmaComponents.Label {
-                                text: i18n("On AC Mode:")
+                        Kirigami.Icon {
+                            source: {
+                                var powerState = modelData.powerState.trim().toLowerCase();
+                                var isActive = (powerState !== "d3cold" && powerState !== "unknown" && powerState !== "suspended");
+                                return isActive ? "cardwire-plasmoid-gpu-integrated-active" : "cardwire-plasmoid-gpu-integrated";
                             }
-                            ComboBox {
-                                model: ["Integrated", "Hybrid", "Manual", "Smart"]
-                                currentIndex: {
-                                    switch (plasmoid.batteryAutoSwitchMode) {
-                                        case 0: return 0;
-                                        case 1: return 1;
-                                        case 2: return 2;
-                                        case 3: return 3;
-                                        default: return 1;
-                                    }
-                                }
-                                onActivated: {
-                                    var modesMap = [0, 1, 2, 3];
-                                    plasmoid.batteryAutoSwitchMode = modesMap[currentIndex];
-                                }
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                            opacity: {
+                                var powerState = modelData.powerState.trim().toLowerCase();
+                                return (powerState === "d3cold" || powerState === "unknown" || powerState === "suspended") ? 0.35 : 1.0;
+                            }
+                        }
+
+                        PlasmaComponents.Label {
+                            text: {
+                                var prefix = modelData.isDefault ? i18n("iGPU") : i18n("dGPU");
+                                return prefix + ": " + modelData.powerState;
+                            }
+                            font.bold: true
+                            opacity: {
+                                var powerState = modelData.powerState.trim().toLowerCase();
+                                return (powerState === "d3cold" || powerState === "unknown" || powerState === "suspended") ? 0.6 : 1.0;
                             }
                         }
                     }
                 }
+
+                Item { Layout.fillWidth: true }
             }
         }
 
@@ -180,75 +109,94 @@ PlasmoidItem {
             explanation: i18n("Please ensure that cardwired systemd service is active.")
         }
 
-        // Normal UI
+        // Clean graphics switcher list
         ScrollView {
             anchors.fill: parent
             visible: !plasmoid.isDaemonFailing
 
-                ColumnLayout {
-                    width: parent.width - Kirigami.Units.gridUnit
-                    spacing: Kirigami.Units.gridUnit
+            ColumnLayout {
+                width: availableWidth
+                spacing: Kirigami.Units.smallSpacing
 
-                    // GPU status list
-                    PlasmaComponents.Label {
-                        text: i18n("Detected GPUs:")
-                        font.bold: true
-                    }
+                // 1. Modes List
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
 
                     Repeater {
-                        model: plasmoid.gpus
-                        delegate: RowLayout {
-                            id: gpuDelegate
+                        model: ListModel {
+                            id: modesModel
+                            ListElement { modeId: 0; name: "Integrated"; icon: "cardwire-plasmoid-gpu-integrated"; desc: "Blocks discrete GPU to maximize battery life." }
+                            ListElement { modeId: 1; name: "Hybrid"; icon: "cardwire-plasmoid-gpu-hybrid"; desc: "Unblocks discrete GPU for on-demand offloading." }
+                            ListElement { modeId: 3; name: "Smart"; icon: "cardwire-plasmoid-gpu-smart"; desc: "Dynamically manages offloading using eBPF hooks." }
+                            ListElement { modeId: 2; name: "Manual"; icon: "cardwire-plasmoid-gpu-manual"; desc: "Enables manual blocking of individual GPUs." }
+                        }
+
+                        delegate: MouseArea {
+                            id: modeDelegate
                             Layout.fillWidth: true
-                            spacing: Kirigami.Units.gridUnit
-                            required property var modelData
+                            implicitHeight: layoutRow.implicitHeight + Kirigami.Units.smallSpacing * 2
+                            hoverEnabled: true
+                            required property int modeId
+                            required property string name
+                            required property string icon
+                            required property string desc
 
-                            Kirigami.Icon {
-                                source: modelData.isDefault ? "computer-laptop" : "video-card"
-                                Layout.preferredWidth: Kirigami.Units.iconSizes.medium
-                                Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                            // Highlight item on hover or if active
+                            Rectangle {
+                                anchors.fill: parent
+                                color: plasmoid.mode === modeId ? Kirigami.Theme.highlightColor : (parent.containsMouse ? Kirigami.Theme.hoverColor : "transparent")
+                                opacity: plasmoid.mode === modeId ? 0.25 : 0.1
+                                radius: Kirigami.Units.smallSpacing
                             }
 
-                            ColumnLayout {
-                                spacing: 2
-                                Layout.fillWidth: true
-                                PlasmaComponents.Label {
-                                    text: modelData.name + (modelData.isDefault ? " (" + i18n("Default") + ")" : " (" + i18n("Discrete") + ")")
-                                    font.bold: true
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
+                            RowLayout {
+                                id: layoutRow
+                                anchors.fill: parent
+                                anchors.margins: Kirigami.Units.smallSpacing
+                                spacing: Kirigami.Units.gridUnit
+
+                                Kirigami.Icon {
+                                    source: icon
+                                    Layout.preferredWidth: Kirigami.Units.iconSizes.medium
+                                    Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                                 }
-                                PlasmaComponents.Label {
-                                    text: i18n("Power: %1 | %2", modelData.powerState, modelData.appCount > 0 ? i18np("%1 active process", "%1 active processes", modelData.appCount) : i18n("No active processes"))
-                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                    opacity: 0.7
-                                    color: modelData.appCount > 0 ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+
+                                ColumnLayout {
+                                    spacing: 2
                                     Layout.fillWidth: true
-
-                                    // Hover processes list tooltip
-                                    ToolTip {
-                                        visible: maHover.containsMouse && modelData.appCount > 0
-                                        text: modelData.appDetails
+                                    PlasmaComponents.Label {
+                                        text: name
+                                        font.bold: true
                                     }
-
-                                    MouseArea {
-                                        id: maHover
-                                        anchors.fill: parent
-                                        hoverEnabled: true
+                                    PlasmaComponents.Label {
+                                        text: desc
+                                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                        opacity: 0.7
+                                        wrapMode: Text.Wrap
+                                        Layout.fillWidth: true
                                     }
                                 }
-                            }
 
-                            PlasmaComponents.CheckBox {
-                                visible: !modelData.isDefault && plasmoid.mode === 2 // Only toggle discrete GPU in manual mode
-                                text: i18n("Block")
-                                checked: modelData.isBlocked
-                                onToggled: modelData.isBlocked = checked
+                                PlasmaComponents.Button {
+                                    text: plasmoid.mode === modeId ? i18n("Active") : i18n("Apply")
+                                    flat: true
+                                    down: plasmoid.mode === modeId
+                                    enabled: plasmoid.mode !== modeId
+                                    onClicked: plasmoid.setMode(modeId)
+                                }
                             }
                         }
                     }
+                }
 
-                    // Separation line
+                // 2. Expandable GPU blocking list when Manual Mode is active
+                ColumnLayout {
+                    visible: plasmoid.mode === 2 // Manual mode
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+                    Layout.topMargin: Kirigami.Units.gridUnit
+
                     KSvg.SvgItem {
                         Layout.fillWidth: true
                         height: 2
@@ -256,84 +204,45 @@ PlasmoidItem {
                         svg: KSvg.Svg { imagePath: "widgets/line" }
                     }
 
-                    // Mode selections
                     PlasmaComponents.Label {
-                        text: i18n("Choose Mode:")
+                        text: i18n("Manual GPU Block Control:")
                         font.bold: true
+                        Layout.topMargin: Kirigami.Units.smallSpacing
                     }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                    Repeater {
+                        model: plasmoid.gpus
+                        delegate: RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.gridUnit
 
-                        Repeater {
-                            model: ListModel {
-                                id: modesModel
-                                ListElement { modeId: 0; name: "Integrated"; icon: "cardwire-plasmoid-gpu-integrated"; desc: "Blocks discrete GPU completely to maximize battery life." }
-                                ListElement { modeId: 1; name: "Hybrid"; icon: "cardwire-plasmoid-gpu-hybrid"; desc: "Unblocks discrete GPU for on-demand performance offloading." }
-                                ListElement { modeId: 3; name: "Smart"; icon: "cardwire-plasmoid-gpu-smart"; desc: "Dynamically whitelists heavy apps/games via eBPF hooks." }
-                                ListElement { modeId: 2; name: "Manual"; icon: "cardwire-plasmoid-gpu-manual"; desc: "Enables manual blocking of individual GPUs." }
+                            ColumnLayout {
+                                spacing: 2
+                                Layout.fillWidth: true
+                                PlasmaComponents.Label {
+                                    text: modelData.name + (modelData.isDefault ? " (" + i18n("iGPU") + ")" : " (" + i18n("dGPU") + ")")
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
+                                PlasmaComponents.Label {
+                                    text: i18n("Pci Bus: %1", modelData.pci)
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                    opacity: 0.7
+                                    Layout.fillWidth: true
+                                }
                             }
 
-                            delegate: MouseArea {
-                                id: modeDelegate
-                                Layout.fillWidth: true
-                                implicitHeight: layoutRow.implicitHeight + Kirigami.Units.smallSpacing * 2
-                                hoverEnabled: true
-                                required property int modeId
-                                required property string name
-                                required property string icon
-                                required property string desc
-
-                                // Highlight current selected mode
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: plasmoid.mode === modeId ? Kirigami.Theme.highlightColor : (parent.containsMouse ? Kirigami.Theme.hoverColor : "transparent")
-                                    opacity: plasmoid.mode === modeId ? 0.3 : 0.1
-                                    radius: 4
-                                }
-
-                                RowLayout {
-                                    id: layoutRow
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: Kirigami.Units.smallSpacing
-                                    spacing: Kirigami.Units.gridUnit
-
-                                    Kirigami.Icon {
-                                        source: icon
-                                        Layout.preferredWidth: Kirigami.Units.iconSizes.medium
-                                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
-                                    }
-
-                                    ColumnLayout {
-                                        spacing: 2
-                                        Layout.fillWidth: true
-                                        PlasmaComponents.Label {
-                                            text: name
-                                            font.bold: true
-                                        }
-                                        PlasmaComponents.Label {
-                                            text: desc
-                                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                                            opacity: 0.7
-                                            wrapMode: Text.Wrap
-                                            Layout.fillWidth: true
-                                        }
-                                    }
-
-                                    PlasmaComponents.Button {
-                                        text: i18n("Apply")
-                                        flat: true
-                                        enabled: plasmoid.mode !== modeId
-                                        onClicked: plasmoid.setMode(modeId)
-                                    }
-                                }
+                            PlasmaComponents.CheckBox {
+                                text: i18n("Block")
+                                checked: modelData.isBlocked
+                                enabled: !modelData.isDefault
+                                onToggled: modelData.isBlocked = checked
                             }
                         }
                     }
                 }
             }
+        }
     }
 }

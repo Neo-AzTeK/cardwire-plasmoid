@@ -12,8 +12,6 @@ class CardwireGpu : public QObject {
     Q_PROPERTY(bool isDefault READ isDefault CONSTANT)
     Q_PROPERTY(bool isBlocked READ isBlocked WRITE setBlocked NOTIFY blockedChanged)
     Q_PROPERTY(QString powerState READ powerState NOTIFY powerStateChanged)
-    Q_PROPERTY(int appCount READ appCount NOTIFY appsChanged)
-    Q_PROPERTY(QString appDetails READ appDetails NOTIFY appsChanged)
 
 public:
     CardwireGpu(int id, const QString &name, const QString &pci, bool isDefault, bool isBlocked, const QString &powerState, QObject *parent = nullptr);
@@ -29,14 +27,9 @@ public:
     QString powerState() const { return m_powerState; }
     void updatePowerState(const QString &state);
 
-    int appCount() const { return m_appCount; }
-    QString appDetails() const { return m_appDetails; }
-    void updateApps(int count, const QString &details);
-
 signals:
     void blockedChanged(bool blocked);
     void powerStateChanged(const QString &state);
-    void appsChanged();
 
 private:
     int m_id;
@@ -45,8 +38,6 @@ private:
     bool m_isDefault;
     bool m_isBlocked;
     QString m_powerState;
-    int m_appCount = 0;
-    QString m_appDetails;
 };
 
 #endif // CARDWIREGPU_H

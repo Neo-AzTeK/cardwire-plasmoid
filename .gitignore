@@ -2,3 +2,7 @@
 /.cmake/
 /CMakeLists.txt.user
 /cardwire-plasmoid.kdev4
+/pkg/
+/src/build/
+*.pkg.tar.zst
+*.pkg.tar.zst.sig

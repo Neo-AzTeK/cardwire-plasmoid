@@ -75,7 +75,6 @@ private:
     void fetchMode();
     void fetchConfig();
     void fetchGpuList();
-    void fetchGpuLsof(CardwireGpu *gpu);
     void updateGpuPowerStates();
 };
 

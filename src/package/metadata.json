@@ -12,14 +12,16 @@
         "FormFactors": [
             "desktop"
         ],
-        "Icon": "cardwire-plasmoid-gpu-dedicated",
+        "Icon": "cardwire-plasmoid-gpu-integrated",
         "Id": "dev.opengamingcollective.cardwire",
         "License": "GPL-3.0",
         "Name": "Cardwire",
+        "NoDisplay": true,
         "Version": "0.1.0",
         "Website": "https://github.com/OpenGamingCollective/cardwire"
     },
     "KPackageStructure": "Plasma/Applet",
     "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-NotificationArea": true,
     "X-Plasma-NotificationAreaCategory": "Hardware"
 }

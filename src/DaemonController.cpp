@@ -12,7 +12,7 @@ DaemonController::DaemonController() {
 
     auto timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &DaemonController::pollDaemon);
-    timer->setInterval(5000);
+    timer->setInterval(2000);
     timer->start();
 }
 
@@ -113,57 +113,11 @@ void DaemonController::fetchGpuList() {
                 gpu->updateBlocked(isBlocked);
                 gpu->updatePowerState(powerState);
             }
-
-            fetchGpuLsof(gpu);
         }
 
         if (listChanged) {
             emit gpusChanged();
         }
-    });
-}
-
-void DaemonController::fetchGpuLsof(CardwireGpu *gpu) {
-    int gpuId = gpu->id();
-    runCommand({"gpu", QString::number(gpuId), "--lsof"}, [this, gpuId](const QString &output, int exitCode) {
-        if (exitCode != 0) return;
-
-        CardwireGpu *targetGpu = nullptr;
-        for (CardwireGpu *g : std::as_const(m_gpus)) {
-            if (g->id() == gpuId) {
-                targetGpu = g;
-                break;
-            }
-        }
-        if (!targetGpu) return;
-
-        QSet<QString> uniqueApps;
-        QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-        for (const QString &line : lines) {
-            int colonIdx = line.indexOf(':');
-            if (colonIdx != -1) {
-                QString arrayPart = line.mid(colonIdx + 1).trimmed();
-                if (arrayPart.startsWith('[') && arrayPart.endsWith(']')) {
-                    QString content = arrayPart.mid(1, arrayPart.length() - 2);
-                    QStringList apps = content.split(',', Qt::SkipEmptyParts);
-                    for (const QString &app : apps) {
-                        QString cleanedApp = app.trimmed();
-                        if (cleanedApp.startsWith('"') && cleanedApp.endsWith('"')) {
-                            cleanedApp = cleanedApp.mid(1, cleanedApp.length() - 2);
-                        }
-                        if (!cleanedApp.isEmpty()) {
-                            uniqueApps.insert(cleanedApp);
-                        }
-                    }
-                }
-            }
-        }
-
-        int count = uniqueApps.size();
-        QStringList sortedApps = uniqueApps.values();
-        sortedApps.sort();
-        QString details = sortedApps.join(QStringLiteral("\n"));
-        targetGpu->updateApps(count, details);
     });
 }
 
