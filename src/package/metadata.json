@@ -1,0 +1,26 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "info@opengamingcollective.github.io",
+                "Name": "Open Gaming Collective"
+            }
+        ],
+        "Category": "Utilities",
+        "Description": "Switch between GPU modes via cardwired",
+        "EnabledByDefault": true,
+        "FormFactors": [
+            "desktop"
+        ],
+        "Icon": "cardwire-plasmoid-gpu-dedicated",
+        "Id": "dev.opengamingcollective.cardwire",
+        "License": "GPL-3.0",
+        "Name": "Cardwire",
+        "Version": "0.1.0",
+        "Website": "https://github.com/OpenGamingCollective/cardwire"
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-DBusActivationService": "com.github.opengamingcollective.cardwire",
+    "X-Plasma-NotificationAreaCategory": "Hardware"
+}

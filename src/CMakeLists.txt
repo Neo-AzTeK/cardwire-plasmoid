@@ -1,0 +1,23 @@
+add_compile_definitions(TRANSLATION_DOMAIN="plasma_applet_dev.opengamingcollective.cardwire")
+
+add_library(dev.opengamingcollective.cardwire MODULE
+    CardwireApplet.cpp
+    CardwireApplet.h
+    DaemonController.cpp
+    DaemonController.h
+    CardwireGpu.cpp
+    CardwireGpu.h
+)
+
+target_link_libraries(dev.opengamingcollective.cardwire
+    Qt6::Gui
+    Qt6::DBus
+    Qt6::Qml
+    Plasma::Plasma
+    KF6::I18n
+    KF6::Solid
+)
+
+install(TARGETS dev.opengamingcollective.cardwire DESTINATION ${KDE_INSTALL_PLUGINDIR}/plasma/applets)
+
+plasma_install_package(package dev.opengamingcollective.cardwire)
