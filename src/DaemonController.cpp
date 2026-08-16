@@ -43,7 +43,7 @@ QString DaemonController::modeToString(GpuMode mode) {
 void DaemonController::pollDaemon() {
     bool hasCli = !QStandardPaths::findExecutable(QStringLiteral("cardwire")).isEmpty();
     bool hasDaemon = QDBusConnection::systemBus().interface() &&
-                     QDBusConnection::systemBus().interface()->isServiceRegistered(QStringLiteral("com.github.opengamingcollective.cardwire"));
+                     QDBusConnection::systemBus().interface()->isServiceRegistered(QStringLiteral("org.opengamingcollective.cardwire"));
 
     bool failing = (!hasCli || !hasDaemon);
     if (failing != m_isDaemonFailing) {
