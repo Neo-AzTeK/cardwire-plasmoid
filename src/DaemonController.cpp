@@ -10,6 +10,8 @@
 #include <QStandardPaths>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
+#include <QDBusInterface>
+#include <QDBusReply>
 
 DaemonController::DaemonController() {
     pollDaemon();
@@ -117,11 +119,7 @@ void DaemonController::fetchGpuList() {
             bool isDefault = gpuObj.value("default").toBool();
             bool isBlocked = gpuObj.value("blocked").toBool();
 
-            QString powerState = QStringLiteral("Unknown");
-            QFile powerFile(QStringLiteral("/sys/bus/pci/devices/%1/power_state").arg(pci));
-            if (powerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-                powerState = QString::fromUtf8(powerFile.readAll()).trimmed();
-            }
+            QString powerState = fetchGpuPowerState(id, pci);
 
             CardwireGpu *gpu = nullptr;
             for (CardwireGpu *g : std::as_const(m_gpus)) {
@@ -288,11 +286,26 @@ void DaemonController::processNextCommand() {
 
 void DaemonController::updateGpuPowerStates() {
     for (CardwireGpu *gpu : std::as_const(m_gpus)) {
-        QString powerState = QStringLiteral("Unknown");
-        QFile powerFile(QStringLiteral("/sys/bus/pci/devices/%1/power_state").arg(gpu->pci()));
-        if (powerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            powerState = QString::fromUtf8(powerFile.readAll()).trimmed();
-        }
-        gpu->updatePowerState(powerState);
+        gpu->updatePowerState(fetchGpuPowerState(gpu->id(), gpu->pci()));
     }
+}
+
+QString DaemonController::fetchGpuPowerState(int id, const QString &pci) {
+    QDBusInterface gpuInterface(
+        QStringLiteral("org.opengamingcollective.cardwire"),
+        QStringLiteral("/org/opengamingcollective/cardwire/Gpu/%1").arg(id),
+        QStringLiteral("org.opengamingcollective.cardwire.Gpu"),
+        QDBusConnection::systemBus()
+    );
+    QDBusReply<QString> reply = gpuInterface.call(QStringLiteral("PowerState"));
+    if (reply.isValid()) {
+        return reply.value().trimmed();
+    }
+
+    QString powerState = QStringLiteral("Unknown");
+    QFile powerFile(QStringLiteral("/sys/bus/pci/devices/%1/power_state").arg(pci));
+    if (powerFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        powerState = QString::fromUtf8(powerFile.readAll()).trimmed();
+    }
+    return powerState;
 }

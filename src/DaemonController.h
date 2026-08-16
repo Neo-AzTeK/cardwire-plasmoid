@@ -85,6 +85,7 @@ private:
     void fetchConfig();
     void fetchGpuList();
     void updateGpuPowerStates();
+    QString fetchGpuPowerState(int id, const QString &pci);
 };
 
 #endif // DAEMONCONTROLLER_H
