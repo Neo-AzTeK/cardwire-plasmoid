@@ -37,7 +37,7 @@ Ensure you have `cmake`, `extra-cmake-modules` (ECM), and development headers fo
 
 * **Fedora:**
   ```bash
-  sudo dnf install cmake extra-cmake-modules kf6-kconfig-devel kf6-ki18n-devel kf6-solid-devel libplasma-devel qt6-qtbase-devel qt6-qtdeclarative-devel gcc-c++ gettext
+  sudo dnf install cmake extra-cmake-modules kf6-kconfig-devel kf6-kcoreaddons-devel kf6-ki18n-devel kf6-solid-devel libplasma-devel qt6-qtbase-devel qt6-qtdeclarative-devel gcc-c++ gettext
   ```
 * **Ubuntu / Debian / KDE Neon:**
   ```bash
